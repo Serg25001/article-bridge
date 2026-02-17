@@ -1,13 +1,15 @@
 <?php
 /**
  * Plugin Name: Article Bridge
- * Plugin URI: https://example.com/article-bridge
- * Description: Import posts via REST API with HTML, images, categories, tags, thumbnails and token authentication.
+ * Plugin URI: https://github.com/Serg25001/article-bridge
+ * Description: Securely import posts, media, categories, tags, and featured images into WordPress via a REST API using token-based authentication.
  * Version: 2.2.0
- * Author: Article Bridge
+ * Author: Serg25001
+ * Author URI: https://github.com/Serg25001
  * License: GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: article-bridge
+ * Domain Path: /languages
  */
 
 defined('ABSPATH') || exit;
