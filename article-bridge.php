@@ -241,8 +241,14 @@ final class Article_Bridge {
         if (!current_user_can('manage_options')) return;
 
         if (isset($_POST['regenerate'])) {
-            check_admin_referer('ab_regenerate');
+
+            // ✅ Проверяем nonce
+            if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'ab_regenerate')) {
+                wp_die('Nonce verification failed');
+            }
+
             $token = self::generate_token();
+
             echo '<div class="notice notice-success"><p><strong>Save token now:</strong></p><code>' . esc_html($token) . '</code></div>';
         }
         ?>
@@ -256,6 +262,7 @@ final class Article_Bridge {
         </div>
         <?php
     }
+
 }
 
 /* ================= BOOTSTRAP ================= */
