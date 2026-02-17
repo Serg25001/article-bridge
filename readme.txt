@@ -3,7 +3,7 @@ Contributors: your_wp_username
 Donate link: https://github.com/Serg25001/article-bridge
 Tags: rest-api, import, posts, media, automation
 Requires at least: 5.8
-Tested up to: 6.4
+Tested up to: 6.9
 Requires PHP: 7.4
 Stable tag: 2.2.0
 License: GPLv2 or later

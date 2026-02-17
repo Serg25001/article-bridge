@@ -12,7 +12,7 @@
  * Domain Path: /languages
  */
 
-defined('ABSPATH') || exit;
+defined( 'ABSPATH' ) || exit;
 
 final class Article_Bridge {
 
@@ -20,52 +20,47 @@ final class Article_Bridge {
     const SYSTEM_USER_LOGIN = 'article_bridge';
 
     /* ================= INIT ================= */
-
     public static function init() {
-        add_action('rest_api_init', [self::class, 'register_routes']);
-        add_action('admin_menu', [self::class, 'admin_menu']);
+        add_action( 'rest_api_init', [ self::class, 'register_routes' ] );
+        add_action( 'admin_menu', [ self::class, 'admin_menu' ] );
     }
 
     /* ================= ACTIVATION ================= */
-
     public static function activate() {
-        if (!get_option(self::OPTION_TOKEN_HASH)) {
+        if ( ! get_option( self::OPTION_TOKEN_HASH ) ) {
             self::generate_token();
         }
     }
 
     /* ================= TOKEN ================= */
-
     private static function generate_token(): string {
-        $token = bin2hex(random_bytes(32));
-        update_option(self::OPTION_TOKEN_HASH, hash('sha256', $token), false);
+        $token = bin2hex( random_bytes( 32 ) );
+        update_option( self::OPTION_TOKEN_HASH, hash( 'sha256', $token ), false );
         return $token;
     }
 
-    private static function validate_token(string $token): bool {
-        $stored = get_option(self::OPTION_TOKEN_HASH);
-        return $stored && hash_equals($stored, hash('sha256', $token));
+    private static function validate_token( string $token ): bool {
+        $stored = get_option( self::OPTION_TOKEN_HASH );
+        return $stored && hash_equals( $stored, hash( 'sha256', $token ) );
     }
 
     /* ================= AUTH ================= */
+    public static function permission_callback( \WP_REST_Request $request ) {
+        $header = $request->get_header( 'authorization' );
 
-    public static function permission_callback(\WP_REST_Request $request) {
-
-        $header = $request->get_header('authorization');
-
-        if (!$header || strpos($header, 'Bearer ') !== 0) {
+        if ( ! $header || strpos( $header, 'Bearer ' ) !== 0 ) {
             return new \WP_Error(
                 'ab_unauthorized',
-                __('Missing token', 'article-bridge'),
-                ['status' => 401]
+                __( 'Missing token', 'article-bridge' ),
+                [ 'status' => 401 ]
             );
         }
 
-        if (!self::validate_token(substr($header, 7))) {
+        if ( ! self::validate_token( substr( $header, 7 ) ) ) {
             return new \WP_Error(
                 'ab_forbidden',
-                __('Invalid token', 'article-bridge'),
-                ['status' => 403]
+                __( 'Invalid token', 'article-bridge' ),
+                [ 'status' => 403 ]
             );
         }
 
@@ -73,199 +68,207 @@ final class Article_Bridge {
     }
 
     /* ================= SYSTEM USER ================= */
-
     private static function ensure_system_user(): int {
+        $user = get_user_by( 'login', self::SYSTEM_USER_LOGIN );
 
-        $user = get_user_by('login', self::SYSTEM_USER_LOGIN);
-
-        if (!$user) {
+        if ( ! $user ) {
             $user_id = wp_create_user(
                 self::SYSTEM_USER_LOGIN,
-                wp_generate_password(32),
+                wp_generate_password( 32 ),
                 'noreply@localhost'
             );
 
-            if (is_wp_error($user_id)) {
+            if ( is_wp_error( $user_id ) ) {
                 return get_current_user_id();
             }
 
-            $user = get_user_by('id', $user_id);
-            $user->set_role('editor');
+            $user = get_user_by( 'id', $user_id );
+            $user->set_role( 'editor' );
         }
 
-        wp_set_current_user($user->ID);
+        wp_set_current_user( $user->ID );
         return (int) $user->ID;
     }
 
     /* ================= ROUTES ================= */
-
     public static function register_routes() {
 
-        register_rest_route('article-bridge/v1', '/post', [
-            'methods'  => \WP_REST_Server::CREATABLE,
-            'callback' => [self::class, 'create_post'],
-            'permission_callback' => [self::class, 'permission_callback'],
-        ]);
+        $routes = [
+            '/post'          => [ 'create_post' ],
+            '/media'         => [ 'upload_media' ],
+            '/category'      => [ 'create_category' ],
+            '/tag'           => [ 'create_tag' ],
+            '/set-thumbnail' => [ 'set_thumbnail' ],
+        ];
 
-        register_rest_route('article-bridge/v1', '/media', [
-            'methods'  => \WP_REST_Server::CREATABLE,
-            'callback' => [self::class, 'upload_media'],
-            'permission_callback' => [self::class, 'permission_callback'],
-        ]);
-
-        register_rest_route('article-bridge/v1', '/category', [
-            'methods'  => \WP_REST_Server::CREATABLE,
-            'callback' => [self::class, 'create_category'],
-            'permission_callback' => [self::class, 'permission_callback'],
-        ]);
-
-        register_rest_route('article-bridge/v1', '/tag', [
-            'methods'  => \WP_REST_Server::CREATABLE,
-            'callback' => [self::class, 'create_tag'],
-            'permission_callback' => [self::class, 'permission_callback'],
-        ]);
-
-        register_rest_route('article-bridge/v1', '/set-thumbnail', [
-            'methods'  => \WP_REST_Server::CREATABLE,
-            'callback' => [self::class, 'set_thumbnail'],
-            'permission_callback' => [self::class, 'permission_callback'],
-        ]);
+        foreach ( $routes as $route => $callback ) {
+            register_rest_route(
+                'article-bridge/v1',
+                $route,
+                [
+                    'methods'             => \WP_REST_Server::CREATABLE,
+                    'callback'            => [ self::class, $callback[0] ],
+                    'permission_callback' => [ self::class, 'permission_callback' ],
+                ]
+            );
+        }
     }
 
     /* ================= POST ================= */
-
-    public static function create_post(\WP_REST_Request $r) {
+    public static function create_post( \WP_REST_Request $r ) {
 
         self::ensure_system_user();
 
         $data = $r->get_json_params();
 
-        if (empty($data['title']) || empty($data['content'])) {
-            return new \WP_Error('ab_bad_request', 'Title and content required', ['status' => 400]);
+        if ( empty( $data['title'] ) || empty( $data['content'] ) ) {
+            return new \WP_Error( 'ab_bad_request', 'Title and content required', [ 'status' => 400 ] );
         }
 
-        $post_id = wp_insert_post([
-            'post_title'   => wp_strip_all_tags($data['title']),
-            'post_content' => $data['content'],
-            'post_status'  => $data['status'] ?? 'publish',
-            'post_type'    => 'post',
-            'post_author'  => get_current_user_id(),
-            'post_date'    => $data['date'] ?? current_time('mysql'),
-        ], true);
+        $post_id = wp_insert_post(
+            [
+                'post_title'   => wp_strip_all_tags( $data['title'] ),
+                'post_content' => $data['content'],
+                'post_status'  => $data['status'] ?? 'publish',
+                'post_type'    => 'post',
+                'post_author'  => get_current_user_id(),
+                'post_date'    => $data['date'] ?? current_time( 'mysql' ),
+            ],
+            true
+        );
 
-        if (is_wp_error($post_id)) {
+        if ( is_wp_error( $post_id ) ) {
             return $post_id;
         }
 
-        if (!empty($data['categories'])) {
-            wp_set_post_terms($post_id, array_map('intval', $data['categories']), 'category');
+        if ( ! empty( $data['categories'] ) ) {
+            wp_set_post_terms( $post_id, array_map( 'intval', $data['categories'] ), 'category' );
         }
 
-        if (!empty($data['tags'])) {
-            wp_set_post_terms($post_id, array_map('intval', $data['tags']), 'post_tag');
+        if ( ! empty( $data['tags'] ) ) {
+            wp_set_post_terms( $post_id, array_map( 'intval', $data['tags'] ), 'post_tag' );
         }
 
-        return ['post_id' => (int) $post_id];
+        return [ 'post_id' => (int) $post_id ];
     }
 
     /* ================= MEDIA ================= */
+    public static function upload_media( \WP_REST_Request $request ) {
 
-    public static function upload_media(\WP_REST_Request $r) {
+        // Проверка токена
+        $permission = self::permission_callback( $request );
+        if ( is_wp_error( $permission ) ) {
+            return $permission;
+        }
 
-        self::ensure_system_user();
+        // Получаем файл безопасно
+        $file = $request->get_file_params()['file'] ?? null;
 
-        if (empty($_FILES['file'])) {
-            return new \WP_Error('ab_no_file', 'No file', ['status' => 400]);
+        if ( ! $file ) {
+            return new \WP_Error( 'ab_no_file', __( 'No file', 'article-bridge' ), [ 'status' => 400 ] );
         }
 
         require_once ABSPATH . 'wp-admin/includes/file.php';
         require_once ABSPATH . 'wp-admin/includes/media.php';
         require_once ABSPATH . 'wp-admin/includes/image.php';
 
-        $upload = wp_handle_upload($_FILES['file'], ['test_form' => false]);
+        $upload = wp_handle_upload( $file, ['test_form' => false] );
 
-        if (isset($upload['error'])) {
-            return new \WP_Error('ab_upload', $upload['error'], ['status' => 400]);
+        if ( isset( $upload['error'] ) ) {
+            return new \WP_Error( 'ab_upload', $upload['error'], [ 'status' => 400 ] );
         }
 
-        $id = wp_insert_attachment([
+        $id = wp_insert_attachment( [
             'post_mime_type' => $upload['type'],
-            'post_title'     => basename($upload['file']),
+            'post_title'     => basename( $upload['file'] ),
             'post_status'    => 'inherit',
-        ], $upload['file']);
+        ], $upload['file'] );
 
-        wp_update_attachment_metadata($id, wp_generate_attachment_metadata($id, $upload['file']));
+        wp_update_attachment_metadata( $id, wp_generate_attachment_metadata( $id, $upload['file'] ) );
 
         return [
             'attachment_id' => (int) $id,
-            'url' => wp_get_attachment_url($id),
+            'url'           => wp_get_attachment_url( $id ),
         ];
     }
 
-    /* ================= TAXONOMY ================= */
 
-    public static function create_category(\WP_REST_Request $r) {
+
+    /* ================= TAXONOMY ================= */
+    public static function create_category( \WP_REST_Request $r ) {
         self::ensure_system_user();
-        $term = wp_insert_term(sanitize_text_field($r['name']), 'category');
-        return is_wp_error($term) ? $term : ['id' => $term['term_id']];
+        $term = wp_insert_term( sanitize_text_field( $r['name'] ), 'category' );
+        return is_wp_error( $term ) ? $term : [ 'id' => $term['term_id'] ];
     }
 
-    public static function create_tag(\WP_REST_Request $r) {
+    public static function create_tag( \WP_REST_Request $r ) {
         self::ensure_system_user();
-        $term = wp_insert_term(sanitize_text_field($r['name']), 'post_tag');
-        return is_wp_error($term) ? $term : ['id' => $term['term_id']];
+        $term = wp_insert_term( sanitize_text_field( $r['name'] ), 'post_tag' );
+        return is_wp_error( $term ) ? $term : [ 'id' => $term['term_id'] ];
     }
 
     /* ================= THUMBNAIL ================= */
-
-    public static function set_thumbnail(\WP_REST_Request $r) {
+    public static function set_thumbnail( \WP_REST_Request $r ) {
         self::ensure_system_user();
-        set_post_thumbnail((int)$r['post_id'], (int)$r['attachment_id']);
-        return ['ok' => true];
+        set_post_thumbnail( (int) $r['post_id'], (int) $r['attachment_id'] );
+        return [ 'ok' => true ];
     }
 
     /* ================= ADMIN ================= */
-
     public static function admin_menu() {
         add_options_page(
-            'Article Bridge',
-            'Article Bridge',
+            __( 'Article Bridge', 'article-bridge' ),
+            __( 'Article Bridge', 'article-bridge' ),
             'manage_options',
             'article-bridge',
-            [self::class, 'admin_page']
+            [ self::class, 'admin_page' ]
         );
     }
 
     public static function admin_page() {
 
-        if (!current_user_can('manage_options')) return;
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
 
-        if (isset($_POST['regenerate'])) {
+        // 1️⃣ Обрабатываем форму только если была отправка
+        if ( isset( $_POST['regenerate'] ) ) {
 
-            // ✅ Проверяем nonce
-            if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'ab_regenerate')) {
-                wp_die('Nonce verification failed');
+            // 2️⃣ Получаем и очищаем nonce
+            $nonce = isset( $_POST['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ) ) : '';
+
+            // 3️⃣ Проверяем nonce до любых действий
+            if ( ! wp_verify_nonce( $nonce, 'ab_regenerate' ) ) {
+                wp_die( esc_html__( 'Nonce verification failed', 'article-bridge' ) );
             }
 
+            // 4️⃣ Генерируем токен
             $token = self::generate_token();
 
-            echo '<div class="notice notice-success"><p><strong>Save token now:</strong></p><code>' . esc_html($token) . '</code></div>';
+            echo '<div class="notice notice-success">';
+            echo '<p><strong>' . esc_html__( 'Save token now:', 'article-bridge' ) . '</strong></p>';
+            echo '<code>' . esc_html( $token ) . '</code>';
+            echo '</div>';
         }
+
+        // 5️⃣ Форма с nonce
         ?>
         <div class="wrap">
-            <h1>Article Bridge</h1>
+            <h1><?php esc_html_e( 'Article Bridge', 'article-bridge' ); ?></h1>
             <form method="post">
-                <?php wp_nonce_field('ab_regenerate'); ?>
-                <button class="button button-primary" name="regenerate">Generate new token</button>
+                <?php wp_nonce_field( 'ab_regenerate' ); ?>
+                <button type="submit" name="regenerate" class="button button-primary">
+                    <?php esc_html_e( 'Generate new token', 'article-bridge' ); ?>
+                </button>
             </form>
-            <p><code><?php echo esc_html(rest_url('article-bridge/v1/')); ?></code></p>
+            <p><code><?php echo esc_url( rest_url( 'article-bridge/v1/' ) ); ?></code></p>
         </div>
         <?php
     }
 
+
 }
 
 /* ================= BOOTSTRAP ================= */
-
-register_activation_hook(__FILE__, ['Article_Bridge', 'activate']);
+register_activation_hook( __FILE__, [ 'Article_Bridge', 'activate' ] );
 Article_Bridge::init();
