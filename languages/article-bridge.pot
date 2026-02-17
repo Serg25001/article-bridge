@@ -1,0 +1,39 @@
+# Copyright (C) 2026 Article Bridge
+# This file is distributed under the GPLv2 or later.
+msgid ""
+msgstr ""
+"Project-Id-Version: Article Bridge 2.2.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/article-bridge\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-02-17T09:19:48+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: article-bridge\n"
+
+#. Plugin Name of the plugin
+#. Author of the plugin
+#: article-bridge.php
+msgid "Article Bridge"
+msgstr ""
+
+#. Plugin URI of the plugin
+#: article-bridge.php
+msgid "https://example.com/article-bridge"
+msgstr ""
+
+#. Description of the plugin
+#: article-bridge.php
+msgid "Import posts via REST API with HTML, images, categories, tags, thumbnails and token authentication."
+msgstr ""
+
+#: article-bridge.php:57
+msgid "Missing token"
+msgstr ""
+
+#: article-bridge.php:65
+msgid "Invalid token"
+msgstr ""
