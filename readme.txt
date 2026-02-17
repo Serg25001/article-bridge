@@ -1,6 +1,6 @@
 === Article Bridge ===
 Contributors: your_wp_username
-Donate link: https://example.com
+Donate link: https://github.com/Serg25001/article-bridge
 Tags: rest-api, import, posts, media, automation
 Requires at least: 5.8
 Tested up to: 6.4
